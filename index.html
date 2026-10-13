@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<meta name="theme-color" content="#0C3E30">
+<meta name="description" content="A steady-hand web game. Each level is harder than the last. Touch a wall and something comes for you.">
+<title>Don't Lose Your Head — Halloween at Cinemacity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,900;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="grain" aria-hidden="true"></div>
+
+<!-- LANDING -->
+<section class="screen active" id="s-landing">
+  <div id="landing-bg" aria-hidden="true"></div>
+  <div class="beam"></div>
+  <div class="wrap center landing">
+    <p class="label">Halloween at Cinemacity</p>
+    <h1 class="title">Don't<br>Lose<br>Your Head.</h1>
+    <p class="lede">Steady hands win free tickets.<br><span class="shaky">Shaky ones… don't.</span></p>
+    <p class="prize"><span class="label">The prize</span>Tickets to the<br>mystery screening.</p>
+    <div class="warn">
+      <p class="label">Warning</p>
+      <p>Sudden loud sounds. Flashing images.<br>Faces that get far too close.</p>
+      <p>Not for the photosensitive, the faint-hearted,<br>or anyone who's home alone right now.</p>
+      <p class="warn-cta">Headphones on. Lights off. You've been warned.</p>
+    </div>
+    <button class="btn primary" id="btn-begin">I'm in</button>
+    <p class="loading label" id="loadstate">Preloading the dark…</p>
+    <div id="vu-wrap" aria-hidden="true"><i id="vu"></i></div>
+    <div class="settings">
+      <label class="toggle"><input type="checkbox" id="opt-sound" checked><span>Ambient sound</span></label>
+      <label class="toggle"><input type="checkbox" id="opt-offset" checked><span>Cursor above fingertip (mobile)</span></label>
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO PLAY -->
+<section class="screen" id="s-howto">
+  <div class="wrap center">
+    <canvas id="hint" width="300" height="200"></canvas>
+    <h2 class="h2">Start on the light.<br>Don't touch the walls.<br>Don't look back.</h2>
+    <p class="label" id="howto-touch">On a phone the red dot floats above your fingertip, so your finger never hides the path.</p>
+  </div>
+</section>
+
+<!-- LEVEL CARD -->
+<section class="screen black" id="s-card">
+  <div class="wrap center">
+    <p class="label" id="card-label">Level 1</p>
+    <h2 class="h2" id="card-title">The Hallway</h2>
+  </div>
+</section>
+
+<!-- GAME -->
+<section class="screen" id="s-game">
+  <div id="level-plate" aria-hidden="true"></div>
+  <header id="hud">
+    <span class="label" id="hud-level">LEVEL 01 · THE HALLWAY</span>
+    <span id="hud-timer"></span>
+  </header>
+  <div id="progress"><i id="progress-fill"></i></div>
+  <div id="board-wrap"><canvas id="board"></canvas></div>
+  <p class="label hint" id="hud-hint">Hover the light to start</p>
+</section>
+
+<!-- JUMP SCARE -->
+<div id="s-scare" aria-hidden="true">
+  <img id="scare-img" alt="">
+</div>
+
+<!-- LOSE -->
+<section class="screen" id="s-lose">
+  <div class="wrap center">
+    <h2 class="title sm">You lost<br>your head.</h2>
+    <p class="lede">You're scared person <strong id="lose-count">#1,204</strong>.<br>You made it to <span id="lose-level">Level 1</span>.</p>
+    <p class="label">Only those who clear all three levels enter the draw.</p>
+    <div class="stack">
+      <button class="btn primary" data-act="again">Play again</button>
+      <button class="btn" data-act="share">Share</button>
+    </div>
+  </div>
+</section>
+
+<!-- WIN -->
+<section class="screen spotlight" id="s-win">
+  <div class="wrap center">
+    <h2 class="title sm">…You kept<br>your head?</h2>
+    <p class="lede">Bonus entry unlocked.<br>See you in the dark.</p>
+    <div class="stack">
+      <button class="btn primary" data-act="enter">Enter the draw</button>
+      <button class="btn" data-act="share">Share</button>
+      <button class="btn" data-act="again">Play again</button>
+    </div>
+    <p class="label closed-note">The draw is closed. The game isn't.</p>
+  </div>
+</section>
+
+<!-- ENTRY FORM -->
+<section class="screen scroll" id="s-form">
+  <div class="wrap">
+    <p class="label">The draw · 10 pairs of tickets</p>
+    <h2 class="h2">Brave enough to come?<br>Enter the draw.</h2>
+    <form id="entry" novalidate>
+      <label>Full name<input name="name" type="text" autocomplete="name" required></label>
+      <label>Email<input name="email" type="email" autocomplete="email" required></label>
+      <label>Mobile (UAE)<input name="mobile" type="tel" inputmode="tel" placeholder="05x xxx xxxx" autocomplete="tel" required></label>
+      <label>Preferred cinema<select name="cinema" required></select></label>
+      <label>Preferred night<select name="night" required></select></label>
+      <label>Instagram handle <span class="opt">(optional)</span><input name="instagram" type="text" placeholder="@"></label>
+      <label class="check"><input name="terms" type="checkbox" required><span>I accept the <a id="terms-link" href="#terms" target="_blank" rel="noopener">terms &amp; conditions</a> and the <a id="privacy-link" href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</span></label>
+      <label class="check"><input name="marketing" type="checkbox"><span>Keep me posted on Cinemacity screenings and offers.</span></label>
+      <div id="turnstile"></div>
+      <input type="hidden" name="level" value="">
+      <input type="hidden" name="bonus" value="0">
+      <input type="hidden" name="utm" value="">
+      <p class="error label" id="form-error"></p>
+      <button class="btn primary" type="submit">Enter the draw</button>
+      <button class="btn" type="button" data-act="back">Back</button>
+    </form>
+  </div>
+</section>
+
+<!-- THANK YOU -->
+<section class="screen" id="s-thanks">
+  <div class="wrap center">
+    <h2 class="title sm">You're in.</h2>
+    <p class="lede">Winners hear from us on 29 Oct.<br>Now send this to the friend who'd scream loudest.</p>
+    <div class="stack">
+      <button class="btn primary" data-act="share">Share</button>
+      <button class="btn" data-act="again">Play again</button>
+      <a class="btn" id="book-link" href="#" target="_blank" rel="noopener">Book a seat anyway</a>
+    </div>
+  </div>
+</section>
+
+<!-- ROTATE -->
+<section class="screen" id="s-rotate">
+  <div class="wrap center">
+    <h2 class="h2">Rotate your phone.</h2>
+    <p class="label">The dark is taller than it is wide.</p>
+  </div>
+</section>
+
+<!-- SHARE SHEET -->
+<div id="s-share" role="dialog" aria-label="Share">
+  <div class="sheet">
+    <p class="label" id="share-status">Link copied.</p>
+    <h3 class="h2">Send it to the friend<br>who'd scream loudest.</h3>
+    <p class="share-link" id="share-link"></p>
+    <div class="share-grid">
+      <a class="btn" id="sh-wa" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="btn" id="sh-tg" target="_blank" rel="noopener">Telegram</a>
+      <a class="btn" id="sh-x" target="_blank" rel="noopener">X</a>
+      <a class="btn" id="sh-mail">Email</a>
+      <button class="btn" id="sh-copy" type="button">Copy link</button>
+      <button class="btn" id="sh-story" type="button">Save story image</button>
+    </div>
+    <button class="btn primary" id="sh-native" type="button">More options…</button>
+    <button class="btn ghost" id="sh-close" type="button">Close</button>
+  </div>
+</div>
+<canvas id="sharecard" width="1080" height="1920" hidden></canvas>
+
+<script src="js/config.js"></script>
+<script src="levels/levels.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
