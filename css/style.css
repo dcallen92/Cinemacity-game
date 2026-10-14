@@ -68,7 +68,7 @@ body.closed [data-act="enter"]{display:none}
 #board-wrap{flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:0;padding:6px 0}
 #board{display:block;background:var(--black);touch-action:none}
 body:not(.playing) #s-game{cursor:default}
-.hint{padding:10px 0 calc(14px + env(safe-area-inset-bottom));text-align:center}
+.hint{padding:10px 16px calc(14px + env(safe-area-inset-bottom));text-align:center;min-height:calc(2.6em + 24px + env(safe-area-inset-bottom));line-height:1.3;display:flex;align-items:center;justify-content:center} /* fixed height: the text changes on arming and the board must not move */
 
 /* jump scare overlay */
 #s-scare{position:fixed;inset:0;z-index:100;display:none;background:#000;overflow:hidden;align-items:center;justify-content:center}
@@ -121,7 +121,7 @@ body.form-closed #entry{display:none}
 #s-share .sheet{width:min(100%,520px);background:var(--charcoal);border-top:1px solid rgba(236,231,221,.25);padding:22px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center;animation:sheet .25s ease-out}
 @keyframes sheet{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
 #s-share .h2{font-size:clamp(22px,6vw,30px)}
-.share-link{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--ivory-dim);word-break:break-all;-webkit-user-select:all;user-select:all}
+.share-link{font-family:var(--mono);font-size:12px;letter-spacing:.04em;line-height:1.6;color:var(--ivory);white-space:pre-line;word-break:break-word;text-align:left;width:100%;padding:12px;border:1px solid rgba(237,230,214,.2);-webkit-user-select:all;user-select:all}
 .share-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .share-grid .btn{padding:14px 10px;font-size:12px}
 .btn.ghost{border-color:transparent;color:var(--ivory-dim)}
@@ -159,3 +159,22 @@ body.form-closed #entry{display:none}
 #board-wrap,#progress,.hint{position:relative;z-index:1}
 #howto-touch{display:none;max-width:300px;line-height:1.6;text-transform:none;letter-spacing:.06em}
 @media (pointer:coarse){#howto-touch{display:block}}
+
+/* ---- time + leaderboard ---- */
+.time{font-family:var(--mono);font-size:clamp(40px,12vw,64px);line-height:1;letter-spacing:-.02em;color:var(--blood);font-variant-numeric:tabular-nums}
+.time.sm{font-size:clamp(30px,9vw,44px)}
+.board-form{display:flex;gap:8px;width:100%}
+.board-form input{flex:1;font:17px var(--serif);color:var(--ivory);background:rgba(7,36,27,.6);border:1px solid rgba(237,230,214,.35);padding:12px;border-radius:0;min-width:0}
+.board-form input:focus{outline:none;border-color:var(--ivory)}
+.board-form .btn{width:auto;white-space:nowrap;padding:12px 16px}
+.board-form.saved{display:none}
+#board-list{list-style:none;width:100%;display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:13px;letter-spacing:.06em}
+#board-list li{display:grid;grid-template-columns:34px 1fr auto;gap:10px;padding:10px 12px;border:1px solid rgba(237,230,214,.18);align-items:center;text-align:left}
+#board-list li .rank{color:var(--ivory-dim)}
+#board-list li .ms{font-variant-numeric:tabular-nums}
+#board-list li.me{border-color:var(--blood);background:rgba(253,67,52,.12)}
+#board-list li.me .rank{color:var(--blood)}
+#s-board .wrap{gap:14px}
+#s-board{background:var(--kv,none) center/cover no-repeat,var(--charcoal)}
+#s-board::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,36,27,.8),rgba(7,36,27,.85));pointer-events:none}
+#s-board .wrap{position:relative;z-index:1}

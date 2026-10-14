@@ -48,6 +48,21 @@ Round 6: subtle per-level plates behind the board (`assets/levels/`, wide versio
 
 Round 7 (2026-10-14): ambience bed lowered to 0.2 (from 0.32), normalised to 0.5 and run through a −5 dB low-shelf under 140 Hz, about a quarter of the previous loudness so the sub-bass no longer dominates.
 
+Round 8 (2026-10-14): iOS audio. Unlock now listens on touchend/click (Safari ignores touchstart/pointerdown for audio activation), ambience waits for the context's statechange→running before starting, and a near-silent looping <audio> element is played on the first gesture so the iOS audio session switches to playback and Web Audio is heard even with the ringer switch on silent.
+
+Round 9 (2026-10-14): run clock + leaderboard + challenge share. The run time is the sum of the three levels' play time (from arming to the end dot; the cards in between don't count). The win screen shows it big; "Join the leaderboard" asks for a name and saves the time. Without a backend the board lives in this device's `localStorage` (`dlyh_scores`, best 50) and says so on screen; with `apiBase` set it calls `GET /scores?limit=10` and `POST /scores {name, ms}`. The share message is now a block-grid challenge, e.g.
+```
+DON'T LOSE YOUR HEAD 🔪
+I kept my head in 0:27.02 · #1 on the leaderboard
+🟩🟩🟩 3/3 levels
+Beat my time if your hands are steady enough.
+<link>
+```
+(losses show 🟩🟥⬛ with the level reached and the scare number). Share copies message + link and pre-fills WhatsApp / Telegram / X / email.
+Also fixed: the hint strip under the board now has a fixed height; it used to reflow when the level armed, which nudged the board a few pixels and killed the player on their first move.
+
+Round 10 (2026-10-14): link preview thumbnail (`assets/og-image.jpg`, 1200×630, Open Graph + Twitter tags in `index.html` — the og:image URL is absolute and currently points at `https://dcallen92.github.io/dont-lose-your-head/`; change it if the repo name or domain differs, WhatsApp will not show a thumbnail otherwise). Ambience bed replaced with a strings version that has more mid-range, and the engine now high-passes it at 80 Hz, shelves 160 Hz down 4 dB and lifts 600 Hz by 7 dB, so phone speakers (which cannot reproduce sub-bass) actually carry it; touch devices get a 1.6× level boost. Wall contact now counts at the edge of the red dot (radius 2.5 units) instead of its centre, so visibly touching a wall always loses, including while the walls breathe.
+
 Rebalance by editing `levels/levels.js` only (points, `widthPct`, hazard timings).
 
 ## Scare system (brief §05)
@@ -61,6 +76,7 @@ Rebalance by editing `levels/levels.js` only (points, `widthPct`, hazard timings
 ## Backend hooks (not included, see `js/config.js`)
 
 * `POST {apiBase}/scare` → `{count}` atomic global counter. Without a backend the counter runs locally from `counterSeed`.
+* `GET {apiBase}/scores?limit=10` → `[{name, ms}]` fastest first; `POST {apiBase}/scores` `{name, ms}`. Local fallback in `localStorage`.
 * `POST {apiBase}/entries` JSON; return 409 for a duplicate email. Without a backend entries are stored in `localStorage` under `dlyh_entries` (QA only).
 * Cloudflare Turnstile: set `turnstileSiteKey`; the token is posted as `turnstile`.
 * Analytics: every event is pushed to `dataLayer`, and to `gtag` / `fbq` when present:
@@ -68,7 +84,9 @@ Rebalance by editing `levels/levels.js` only (points, `widthPct`, hazard timings
 
 ## Publishing to GitHub
 
-`03-GAME/` is already a git repository with the whole game committed on `main`. This Mac has no GitHub credentials (no `gh`, no SSH key, no stored token), so the push is a one-time manual step:
+Drag-and-drop route: `04-DELIVERY/dont-lose-your-head/` is a plain copy of the game (no `.git`, no zip). On github.com create an empty repo, choose "uploading an existing file", and drag the *contents* of that folder (all files and sub-folders) into the page, then commit. Chrome and Safari upload nested folders correctly when you drag them in.
+
+Command-line route: `03-GAME/` is already a git repository with the whole game committed on `main`. This Mac has no GitHub credentials (no `gh`, no SSH key, no stored token), so the push is a one-time manual step:
 
 1. Create an empty repo on github.com (suggested name `dont-lose-your-head`, private until Cinemacity signs off).
 2. Then, in a terminal:

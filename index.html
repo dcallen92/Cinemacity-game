@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
 <meta name="theme-color" content="#0C3E30">
 <meta name="description" content="A steady-hand web game. Each level is harder than the last. Touch a wall and something comes for you.">
+<!-- Link preview (WhatsApp, iMessage, X). og:image must be an ABSOLUTE url: update the domain when the game is hosted. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Halloween at Cinemacity">
+<meta property="og:title" content="Don't Lose Your Head — steady hands win free tickets">
+<meta property="og:description" content="Three levels. Don't touch the walls. Beat my time and win tickets to Cinemacity's mystery screening.">
+<meta property="og:url" content="https://dcallen92.github.io/dont-lose-your-head/">
+<meta property="og:image" content="https://dcallen92.github.io/dont-lose-your-head/assets/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Don't Lose Your Head — steady hands win free tickets">
+<meta name="twitter:image" content="https://dcallen92.github.io/dont-lose-your-head/assets/og-image.jpg">
 <title>Don't Lose Your Head — Halloween at Cinemacity</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,13 +103,37 @@
 <section class="screen spotlight" id="s-win">
   <div class="wrap center">
     <h2 class="title sm">…You kept<br>your head?</h2>
+    <p class="label">Your time · all three levels</p>
+    <p class="time" id="win-time">0:00.00</p>
     <p class="lede">Bonus entry unlocked.<br>See you in the dark.</p>
     <div class="stack">
-      <button class="btn primary" data-act="enter">Enter the draw</button>
+      <button class="btn primary" data-act="board">Join the leaderboard</button>
+      <button class="btn" data-act="enter">Enter the draw</button>
       <button class="btn" data-act="share">Share</button>
       <button class="btn" data-act="again">Play again</button>
     </div>
     <p class="label closed-note">The draw is closed. The game isn't.</p>
+  </div>
+</section>
+
+<!-- LEADERBOARD -->
+<section class="screen scroll" id="s-board">
+  <div class="wrap center">
+    <p class="label">The steadiest hands</p>
+    <h2 class="h2">Leaderboard</h2>
+    <p class="time sm" id="board-time">0:00.00</p>
+    <form id="board-form" class="board-form">
+      <input name="name" type="text" maxlength="18" placeholder="Your name" autocomplete="nickname" required>
+      <button class="btn primary" type="submit">Save my time</button>
+    </form>
+    <p class="label" id="board-rank"></p>
+    <ol id="board-list"></ol>
+    <p class="label" id="board-scope"></p>
+    <div class="stack">
+      <button class="btn primary" data-act="enter">Enter the draw</button>
+      <button class="btn" data-act="share">Challenge a friend</button>
+      <button class="btn" data-act="again">Play again</button>
+    </div>
   </div>
 </section>
 

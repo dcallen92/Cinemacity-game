@@ -6,10 +6,14 @@ window.DLYH_CONFIG = {
   //   POST {apiBase}/scare            -> { count: 1204 }
   //   GET  {apiBase}/scare            -> { count: 1204 }
   //   POST {apiBase}/entries  (JSON)  -> 200 | 409 (duplicate email)
+  //   GET  {apiBase}/scores?limit=10  -> [{ name, ms }]   (fastest first)
+  //   POST {apiBase}/scores  (JSON { name, ms }) -> { rank }
   apiBase: '',
 
   // Seed for the local counter when no backend is set (so the first player isn't #1).
   counterSeed: 1203,
+  // Leaderboard shown after a win. Without a backend it lives in this device's localStorage.
+  leaderboardSize: 10,
 
   // Draw closes Wed 28 Oct 2026, 23:59 GST (UTC+4). After this the form is hidden.
   closesAt: '2026-10-28T23:59:59+04:00',
@@ -41,8 +45,9 @@ window.DLYH_CONFIG = {
   screams: ['assets/audio/scream-01-shriek.mp3', 'assets/audio/scream-02-roar.mp3', 'assets/audio/scream-03-stab.mp3', 'assets/audio/scream-04-loud.mp3'],
   sfx: { creak: 'assets/audio/creak.mp3', whisper: 'assets/audio/whisper.mp3', door: 'assets/audio/door-squeak.mp3', ambience: 'assets/audio/ambience.mp3', clear: 'assets/audio/level-clear.mp3' },
   // Peak level (0–1) each sound is normalised to at decode. 0.89 ≈ -1 dBFS.
-  levels: { scream: 0.89, creak: 0.6, door: 0.45, whisper: 0.8, ambience: 0.5, clear: 0.8 },
-  ambienceGain: 0.2, // overall ambience level (0–1); the engine also shelves the sub-bass down by 5 dB under 140 Hz
+  levels: { scream: 0.89, creak: 0.6, door: 0.45, whisper: 0.8, ambience: 0.7, clear: 0.8 },
+  ambienceGain: 0.28, // overall ambience level (0–1). The engine high-passes the bed at 80 Hz and lifts the mids so phone speakers can carry it.
+  ambienceMobileBoost: 1.6, // phones have quiet speakers: multiply the bed level on touch devices
   sprites: { door: 'assets/hazards/door.png' },
   shareBg: 'assets/share-bg.jpg',
   landingBg: 'assets/landing-bg.jpg',

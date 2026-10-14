@@ -21,7 +21,7 @@
   }
 
   /* ---------- screens ---------- */
-  const screens = ['s-landing', 's-howto', 's-card', 's-game', 's-lose', 's-win', 's-form', 's-thanks'];
+  const screens = ['s-landing', 's-howto', 's-card', 's-game', 's-lose', 's-win', 's-board', 's-form', 's-thanks'];
   function show(id) {
     screens.forEach(s => $(s).classList.toggle('active', s === id));
     document.body.classList.toggle('playing', id === 's-game' && G.state === 'play');
@@ -54,8 +54,23 @@
       // HTMLAudio fallback in case the AudioContext never leaves 'suspended' (some Safari builds)
       try { this.html = new Audio(CFG.screams[0]); this.html.preload = 'auto'; this.html.volume = 1; } catch (e) {}
     },
+    silentEl: null,
+    keepAlive() { // iOS: a playing <audio> element switches the session to playback, so Web Audio ignores the ringer switch
+      try {
+        if (!this.silentEl) {
+          const sr = 8000, n = sr / 10, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+          const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+          str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+          v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+          const el = document.createElement('audio'); el.src = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })); el.loop = true; el.setAttribute('playsinline', ''); el.volume = 0.01;
+          this.silentEl = el;
+        }
+        if (this.silentEl.paused) this.silentEl.play().catch(() => {});
+      } catch (e) {}
+    },
     unlock() {
       if (!this.ctx) return;
+      this.keepAlive();
       try { this.ctx.resume(); } catch (e) {}
       try { const s = this.ctx.createBufferSource(); s.buffer = this.ctx.createBuffer(1, 1, 22050); s.connect(this.master); s.start(0); } catch (e) {}
       if (this.html && this.ctx.state !== 'running') { try { this.html.muted = true; this.html.play().then(() => { this.html.pause(); this.html.currentTime = 0; this.html.muted = false; }).catch(() => {}); } catch (e) {} }
@@ -64,9 +79,14 @@
     startAmbience() {
       if (!this.ctx) return;
       this.unlock(); // always try to resume: the first call may have happened before any gesture
-      if (this.amb || !$('opt-sound').checked) return;
-      this.amb = this.play('ambience', { loop: true, gain: 0, lowShelf: -5 });
-      if (this.amb) this.setAmbience(CFG.ambienceGain || 0.22, 1.2);
+      if (this.amb || !$('opt-sound').checked || !this.buf.ambience) return;
+      const start = () => {
+        if (this.amb) return;
+        this.amb = this.play('ambience', { loop: true, gain: 0, bedEq: true });
+        if (this.amb) this.setAmbience(ambLevel(), 1.2);
+      };
+      if (this.ctx.state === 'running') start();
+      else { const once = () => { this.ctx.removeEventListener('statechange', once); if (this.ctx.state === 'running') start(); }; this.ctx.addEventListener('statechange', once); }
     },
     level() { if (!this.meter) return -1; const d = new Float32Array(this.meter.fftSize); this.meter.getFloatTimeDomainData(d); let e = 0; for (let i = 0; i < d.length; i++) e += d[i] * d[i]; return Math.sqrt(e / d.length); },
     setAmbience(g, tc) { if (this.amb) this.amb.gain.gain.setTargetAtTime(g, this.ctx.currentTime, tc || 0.4); },
@@ -79,9 +99,11 @@
       if (!this.ctx || !this.buf[name]) return null;
       const s = this.ctx.createBufferSource(), g = this.ctx.createGain();
       s.buffer = this.buf[name]; s.loop = !!opt.loop; g.gain.value = opt.gain == null ? 1 : opt.gain;
-      if (opt.lowShelf) { // tame the sub-bass so the bed sits under the game instead of pressing on the chest
-        const f = this.ctx.createBiquadFilter(); f.type = 'lowshelf'; f.frequency.value = 140; f.gain.value = opt.lowShelf;
-        s.connect(f).connect(g).connect(this.master);
+      if (opt.bedEq) { // ambience bed: drop the inaudible rumble, lift the mids so phone speakers can carry it
+        const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 80; hp.Q.value = 0.7;
+        const sh = this.ctx.createBiquadFilter(); sh.type = 'lowshelf'; sh.frequency.value = 160; sh.gain.value = -4;
+        const pk = this.ctx.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 600; pk.Q.value = 0.7; pk.gain.value = 7;
+        s.connect(hp).connect(sh).connect(pk).connect(g).connect(this.master);
       } else s.connect(g).connect(this.master);
       s.start(0);
       return { src: s, gain: g, stop() { try { s.stop(0); } catch (e) {} } };
@@ -94,6 +116,7 @@
       if (!h) synthScream(this.ctx); // last resort
     }
   };
+  const ambLevel = () => (CFG.ambienceGain || 0.22) * (matchMedia('(pointer:coarse)').matches ? (CFG.ambienceMobileBoost || 1.6) : 1);
   function normalize(b, peak) {
     let m = 0;
     for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c); for (let i = 0; i < d.length; i++) m = Math.max(m, Math.abs(d[i])); }
@@ -188,7 +211,7 @@
   const board = $('board'), ctx = board.getContext('2d');
   const G = {
     L: 0, lv: null, cum: [], w: 0, state: 'idle', t0: 0, progress: 0, cur: null, last: null,
-    rot: 0, rotT: 0, lastMoveT: 0, screen: null, hz: [], loops: {}, creaked: [], trail: [], lastScare: -1, bestLevel: 1, won: false, raf: 0, dpr: 1, scale: 1
+    rot: 0, rotT: 0, lastMoveT: 0, screen: null, runMs: 0, finalMs: 0, hz: [], loops: {}, creaked: [], trail: [], lastScare: -1, bestLevel: 1, won: false, raf: 0, dpr: 1, scale: 1
   };
 
   function fit() {
@@ -321,8 +344,8 @@
     }
     // cursor
     if (G.cur) {
-      ctx.fillStyle = 'rgba(253,67,52,.35)'; ctx.beginPath(); ctx.arc(G.cur[0], G.cur[1], 6, 0, 7); ctx.fill();
-      ctx.fillStyle = '#FD4334'; ctx.beginPath(); ctx.arc(G.cur[0], G.cur[1], 3, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(253,67,52,.3)'; ctx.beginPath(); ctx.arc(G.cur[0], G.cur[1], 4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#FD4334'; ctx.beginPath(); ctx.arc(G.cur[0], G.cur[1], 2.5, 0, 7); ctx.fill();
     }
     ctx.restore();
   }
@@ -345,7 +368,7 @@
         if (r <= 0) { lose('time'); return; }
       }
       if (G.cur && hazardHit(G.cur[0], G.cur[1], t)) { lose('hazard'); return; }
-      if (G.cur) { const n = nearest(G.lv.pts, G.cum, G.cur[0], G.cur[1]); if (n.d > corridorWidth(t) / 2) { lose('wall'); return; } }
+      if (G.cur) { const n = nearest(G.lv.pts, G.cum, G.cur[0], G.cur[1]); if (n.d > corridorWidth(t) / 2 - 2.5) { lose('wall'); return; } }
       if (G.lv.whisper && G.loops.whisper) {
         const g = G.progress > 0.9 ? 0 : 0.05 + 0.95 * G.progress * G.progress;
         G.loops.whisper.gain.gain.setTargetAtTime(g, audio.ctx.currentTime, g === 0 ? 0.001 : 0.1);
@@ -382,7 +405,8 @@
   function processPoint(pt, t) {
     const p = G.lv.pts;
     // swept collision between last and current position
-    const a = G.last || pt, steps = Math.max(1, Math.ceil(Math.hypot(pt[0] - a[0], pt[1] - a[1]) / 1.5)), w2 = corridorWidth(t) / 2;
+    const CURSOR_R = 2.5; // the red dot's own radius: touching the wall with its edge counts
+    const a = G.last || pt, steps = Math.max(1, Math.ceil(Math.hypot(pt[0] - a[0], pt[1] - a[1]) / 1.5)), w2 = corridorWidth(t) / 2 - CURSOR_R;
     for (let i = 1; i <= steps; i++) {
       const x = a[0] + (pt[0] - a[0]) * i / steps, y = a[1] + (pt[1] - a[1]) * i / steps;
       if (x < 0 || y < 0 || x > W || y > H) { G.cur = [x, y]; lose('left'); return; }
@@ -417,6 +441,7 @@
   }
   function clearLevel() {
     G.state = 'clear'; stopLoops(); G.bestLevel = Math.max(G.bestLevel, G.lv.id);
+    G.runMs += now() - G.t0;
     audio.play('clear', { gain: 0.9 });
     track('level_clear_' + G.lv.id, { level: G.lv.id });
     if (G.L < LEVELS.length - 1) {
@@ -443,7 +468,7 @@
     const i = pickScare(), ov = $('s-scare'), im = $('scare-img');
     im.src = scareSrc(i);
     ov.classList.remove('cut'); ov.classList.add('on', 'flash');
-    audio.setAmbience(0, 0.02); setTimeout(() => audio.setAmbience((CFG.ambienceGain || 0.22) * 0.55, 1), 1700);
+    audio.setAmbience(0, 0.02); setTimeout(() => audio.setAmbience(ambLevel() * 0.55, 1), 1700);
     audio.scream(Math.floor(Math.random() * CFG.screams.length));
     try { navigator.vibrate && navigator.vibrate([250, 80, 400]); } catch (e) {}
     setTimeout(() => ov.classList.remove('flash'), 70);
@@ -456,30 +481,73 @@
     show('s-lose');
     const n = await counter.bump(); G.count = n; $('lose-count').textContent = '#' + fmt(n);
   }
+  const fmtTime = ms => { const m = Math.floor(ms / 60000), sec = (ms % 60000) / 1000; return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(2); };
   function win() {
-    G.won = true; track('win'); show('s-win');
+    G.won = true; G.finalMs = G.runMs; track('win', { ms: Math.round(G.finalMs) });
+    $('win-time').textContent = fmtTime(G.finalMs); show('s-win');
   }
+  function resetRun() { G.runMs = 0; G.finalMs = 0; G.won = false; G.saved = false; }
 
   /* ---------- flow ---------- */
   function begin() {
-    audio.startAmbience(); audio.setAmbience((CFG.ambienceGain || 0.22) * 0.55, 1.5); // stays under the game, quieter
+    audio.startAmbience(); audio.setAmbience(ambLevel() * 0.55, 1.5); // stays under the game, quieter
     if (!isIOS && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     try { screen.orientation && screen.orientation.lock && screen.orientation.lock('portrait').catch(() => {}); } catch (e) {}
     track('game_start');
     show('s-howto'); runHint();
+    resetRun();
     setTimeout(() => levelCard(QA.startLevel), 3000);
   }
-  function playAgain() { G.won = false; track('play_again'); levelCard(0); }
+  function playAgain() { resetRun(); track('play_again'); levelCard(0); }
 
   $('btn-begin').addEventListener('click', begin);
-  ['pointerdown', 'keydown', 'touchstart'].forEach(ev => $('s-landing').addEventListener(ev, () => audio.startAmbience(), { passive: true }));
+  ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'].forEach(ev => $('s-landing').addEventListener(ev, () => audio.startAmbience(), { passive: true }));
   $('opt-sound').addEventListener('change', e => { if (e.target.checked) audio.startAmbience(); else audio.stopAmbience(0.3); });
-  document.addEventListener('pointerdown', () => audio.unlock(), { passive: true });
+  ['pointerdown', 'touchend', 'click'].forEach(ev => document.addEventListener(ev, () => audio.unlock(), { passive: true }));
   document.querySelectorAll('[data-act="again"]').forEach(b => b.addEventListener('click', playAgain));
   document.querySelectorAll('[data-act="enter"]').forEach(b => b.addEventListener('click', openForm));
   document.querySelectorAll('[data-act="share"]').forEach(b => b.addEventListener('click', share));
   document.querySelector('[data-act="back"]').addEventListener('click', () => show('s-win'));
   $('s-scare').addEventListener('pointerdown', e => e.preventDefault());
+
+  /* ---------- leaderboard ---------- */
+  const scores = {
+    key: 'dlyh_scores',
+    local() { try { return JSON.parse(localStorage.getItem(this.key) || '[]'); } catch (e) { return []; } },
+    async list() {
+      if (CFG.apiBase) { try { const r = await fetch(CFG.apiBase + '/scores?limit=' + (CFG.leaderboardSize || 10)); if (r.ok) return await r.json(); } catch (e) {} }
+      return this.local().sort((a, b) => a.ms - b.ms).slice(0, CFG.leaderboardSize || 10);
+    },
+    async save(name, ms) {
+      const entry = { name, ms: Math.round(ms), ts: Date.now(), id: Math.random().toString(36).slice(2) };
+      const l = this.local(); l.push(entry); l.sort((a, b) => a.ms - b.ms); try { localStorage.setItem(this.key, JSON.stringify(l.slice(0, 50))); localStorage.setItem('dlyh_name', name); } catch (e) {}
+      if (CFG.apiBase) { try { await fetch(CFG.apiBase + '/scores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, ms: entry.ms }) }); } catch (e) {} }
+      return entry;
+    }
+  };
+  async function openBoard() {
+    if (!G.won || !G.finalMs) return; // the board is for finished runs only
+    $('board-time').textContent = fmtTime(G.finalMs);
+    const f = $('board-form'); f.classList.toggle('saved', !!G.saved);
+    f.elements.name.value = f.elements.name.value || localStorage.getItem('dlyh_name') || '';
+    $('board-scope').textContent = CFG.apiBase ? 'Global · fastest clean runs' : 'Scores on this device · global board goes live with the campaign site';
+    show('s-board'); renderBoard();
+  }
+  async function renderBoard() {
+    const list = await scores.list(), ol = $('board-list'); ol.innerHTML = '';
+    list.forEach((e, i) => { const li = document.createElement('li'); if (G.savedId && e.id === G.savedId) li.className = 'me';
+      li.innerHTML = '<span class="rank">' + String(i + 1).padStart(2, '0') + '</span><span class="name"></span><span class="ms">' + fmtTime(e.ms) + '</span>';
+      li.querySelector('.name').textContent = e.name; ol.appendChild(li); });
+    if (!list.length) ol.innerHTML = '<li><span class="rank">—</span><span class="name">Nobody has kept their head yet.</span><span></span></li>';
+    if (G.savedId) { const all = scores.local().sort((a, b) => a.ms - b.ms), r = all.findIndex(e => e.id === G.savedId) + 1; G.rank = r; $('board-rank').textContent = r ? '#' + r + ' of ' + all.length + ' steady hands' : ''; }
+    else $('board-rank').textContent = G.finalMs ? 'Save your time to see where you land.' : '';
+  }
+  $('board-form').addEventListener('submit', async ev => {
+    ev.preventDefault(); const name = $('board-form').elements.name.value.trim().slice(0, 18); if (!name || G.saved) return;
+    const e = await scores.save(name, G.finalMs); G.saved = true; G.savedId = e.id; track('leaderboard_save', { ms: e.ms });
+    $('board-form').classList.add('saved'); renderBoard();
+  });
+  document.querySelectorAll('[data-act="board"]').forEach(b => b.addEventListener('click', openBoard));
 
   /* ---------- how-to hint ---------- */
   function runHint() {
@@ -542,30 +610,36 @@
 
   /* ---------- share: copy the link, then offer every channel ---------- */
   function shareText() {
-    const count = G.count || counter.local(), level = G.won ? LEVELS.length : (G.lv ? G.lv.id : 1);
-    return (G.won ? 'I kept my head. ' : 'I made it to Level ' + level + '. ') + 'Scared person #' + fmt(count) + '. Your turn.';
+    const n = LEVELS.length, count = G.count || counter.local(), level = G.won ? n : (G.lv ? G.lv.id : 1);
+    const cleared = G.won ? n : level - 1;
+    const grid = Array.from({ length: n }, (_, i) => i < cleared ? '🟩' : i === cleared && !G.won ? '🟥' : '⬛').join('');
+    const lines = ["DON'T LOSE YOUR HEAD 🔪"];
+    if (G.won) { lines.push('I kept my head in ' + fmtTime(G.finalMs) + (G.rank ? ' · #' + G.rank + ' on the leaderboard' : '')); lines.push(grid + ' ' + n + '/' + n + ' levels'); lines.push('Beat my time if your hands are steady enough.'); }
+    else { lines.push('I lost my head on Level ' + level + '. Scared person #' + fmt(count) + '.'); lines.push(grid + ' ' + cleared + '/' + n + ' levels'); lines.push('Think you can do better? Your turn.'); }
+    return lines.join('\n');
   }
   const shareLink = () => CFG.shareUrl || location.href.split('?')[0];
-  async function copyLink() {
-    const url = shareLink();
+  async function copyShare() { return copyLink(shareText() + '\n' + shareLink()); }
+  async function copyLink(txt) {
+    const url = txt || shareLink();
     try { await navigator.clipboard.writeText(url); return true; } catch (e) {}
     try { const ta = document.createElement('textarea'); ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
   }
   async function share() {
     track('share', { level: G.won ? LEVELS.length : (G.lv && G.lv.id) });
-    const ok = await copyLink();
-    $('share-status').textContent = ok ? 'Link copied. Now pick where it goes.' : 'Pick where it goes.';
-    $('share-link').textContent = shareLink().replace(/^https?:\/\//, '');
+    const ok = await copyShare();
+    $('share-status').textContent = ok ? 'Message + link copied. Now pick where it goes.' : 'Pick where it goes.';
+    $('share-link').textContent = shareText() + '\n' + shareLink().replace(/^https?:\/\//, '');
     const text = shareText(), url = shareLink(), enc = encodeURIComponent;
     $('sh-wa').href = 'https://wa.me/?text=' + enc(text + ' ' + url);
     $('sh-tg').href = 'https://t.me/share/url?url=' + enc(url) + '&text=' + enc(text);
-    $('sh-x').href = 'https://twitter.com/intent/tweet?text=' + enc(text) + '&url=' + enc(url);
+    $('sh-x').href = 'https://twitter.com/intent/tweet?text=' + enc(text.replace(/\n/g, ' ')) + '&url=' + enc(url);
     $('sh-mail').href = 'mailto:?subject=' + enc("Don't Lose Your Head") + '&body=' + enc(text + '\n' + url);
     $('sh-native').style.display = navigator.share ? '' : 'none';
     $('s-share').classList.add('on');
   }
   $('sh-close').addEventListener('click', () => $('s-share').classList.remove('on'));
-  $('sh-copy').addEventListener('click', async () => { const ok = await copyLink(); $('share-status').textContent = ok ? 'Link copied.' : 'Could not copy. Long-press the link instead.'; });
+  $('sh-copy').addEventListener('click', async () => { const ok = await copyShare(); $('share-status').textContent = ok ? 'Message + link copied.' : 'Could not copy. Long-press the link instead.'; });
   $('sh-native').addEventListener('click', async () => {
     const blob = await renderCard(), file = blob && new File([blob], 'dont-lose-your-head.png', { type: 'image/png' });
     try {
@@ -594,7 +668,7 @@
     const lines = G.won ? ['I kept', 'my head.'] : ['I made it', 'to Level ' + level + '.'];
     x.fillText(lines[0], 540, 760); x.fillText(lines[1], 540, 900);
     x.font = '500 56px Fraunces, Georgia, serif'; x.letterSpacing = '0px';
-    x.fillText('Scared person #' + fmt(count) + '.', 540, 1040);
+    x.fillText(G.won ? 'Time ' + fmtTime(G.finalMs) + (G.rank ? '  ·  #' + G.rank : '') : 'Scared person #' + fmt(count) + '.', 540, 1040);
     x.font = '900 110px Fraunces, Georgia, serif'; x.letterSpacing = '-3px'; x.fillStyle = '#FD4334';
     x.fillText('Your turn.', 540, 1240);
     x.font = '500 30px "IBM Plex Mono", monospace'; x.letterSpacing = '6px'; x.fillStyle = '#9d9890';
